@@ -1,4 +1,4 @@
-# staffline
+# stafflines
 
 Upload an MP3, get sheet music. Pitch detection via Spotify's [basic-pitch](https://github.com/spotify/basic-pitch), rendered in-browser with [OpenSheetMusicDisplay](https://opensheetmusicdisplay.org/).
 

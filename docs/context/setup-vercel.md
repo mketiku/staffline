@@ -5,7 +5,7 @@ Hosts the Vite frontend. Requires the HF Space to be running first.
 ## 1. Deploy
 
 ```bash
-# From the staffline repo root
+# From the stafflines repo root
 bunx vercel
 ```
 
@@ -15,7 +15,7 @@ Follow the prompts to link your Vercel account and create the project.
 
 ```bash
 bunx vercel env add VITE_API_URL production
-# Enter: https://mketiku-staffline-api.hf.space
+# Enter: https://mketiku-stafflines-api.hf.space
 ```
 
 ## 3. Deploy to production
@@ -28,9 +28,9 @@ bunx vercel --prod
 
 Once you have your Vercel URL, go to HF Space → **Settings** → **Variables and Secrets**:
 
-| Key               | Value                          |
-| ----------------- | ------------------------------ |
-| `ALLOWED_ORIGINS` | `https://staffline.vercel.app` |
+| Key               | Value                           |
+| ----------------- | ------------------------------- |
+| `ALLOWED_ORIGINS` | `https://stafflines.vercel.app` |
 
 The Space restarts automatically.
 

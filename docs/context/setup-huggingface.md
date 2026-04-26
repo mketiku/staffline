@@ -5,7 +5,7 @@ Hosts the FastAPI backend (`../backend/`) as a Docker Space.
 ## 1. Create the Space
 
 1. Go to huggingface.co/new-space
-2. Space name: `staffline-api`
+2. Space name: `stafflines-api`
 3. SDK: **Docker → Blank**
 4. Hardware: **CPU Basic** (free)
 5. Visibility: **Public**
@@ -22,7 +22,7 @@ The backend lives at `~/Projects/staffline/backend/` — its own git repo.
 
 ```bash
 cd ../backend
-git remote add hf git@hf.co:spaces/mketiku/staffline-api
+git remote add hf git@hf.co:spaces/mketiku/stafflines-api
 ```
 
 Requires an SSH key added to your HF account (Settings → SSH Keys).
@@ -41,7 +41,7 @@ Ready when status shows **Running**.
 ## 6. Verify
 
 ```bash
-curl https://mketiku-staffline-api.hf.space/health
+curl https://mketiku-stafflines-api.hf.space/health
 # {"status":"ok"}
 ```
 
