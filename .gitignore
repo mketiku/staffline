@@ -1,0 +1,29 @@
+# deps
+node_modules
+backend/__pycache__
+backend/.venv
+backend/*.pyc
+
+# build
+dist
+.vite
+
+# env
+.env
+.env.local
+.env.*.local
+
+# editor
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# test / coverage
+coverage
+playwright-report
+
+# vercel
+.vercel

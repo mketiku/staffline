@@ -1,0 +1,37 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Canvas / surface */
+  --color-canvas: oklch(10% 0.02 265);
+  --color-surface: oklch(14% 0.02 265);
+  --color-surface-raised: oklch(18% 0.025 265);
+
+  /* Borders */
+  --color-line: oklch(26% 0.025 265);
+
+  /* Text */
+  --color-ink: oklch(95% 0.005 265);
+  --color-ink-dim: oklch(62% 0.02 265);
+
+  /* Accent — warm gold */
+  --color-gold: oklch(80% 0.15 75);
+  --color-gold-dim: oklch(55% 0.12 75);
+
+  /* Status */
+  --color-error: oklch(65% 0.2 25);
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
