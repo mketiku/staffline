@@ -4,10 +4,10 @@
 
 Two-service split:
 
-| Service | Stack | Host |
-|---------|-------|------|
-| Frontend | Vite 6 + React 19 + TypeScript | Vercel |
-| Backend | FastAPI + basic-pitch + music21 | Hugging Face Spaces (Docker) |
+| Service  | Stack                           | Host                         |
+| -------- | ------------------------------- | ---------------------------- |
+| Frontend | Vite 6 + React 19 + TypeScript  | Vercel                       |
+| Backend  | FastAPI + basic-pitch + music21 | Hugging Face Spaces (Docker) |
 
 The frontend calls `POST /transcribe` on the backend, receives MusicXML, and
 renders it with OpenSheetMusicDisplay (OSMD).
@@ -43,7 +43,7 @@ src/
 - Class merging: `cn()` from `@/lib/utils` in every component with conditional classes
 - **No shadcn**, **no CVA** — variants as plain TypeScript objects:
   ```ts
-  const variants: Record<Variant, string> = { primary: '...', ghost: '...' }
+  const variants: Record<Variant, string> = { primary: '...', ghost: '...' };
   ```
 - `cursor-pointer` on all interactive elements
 
@@ -55,10 +55,10 @@ Backend URL is controlled by `VITE_API_URL` (see `.env.example`).
 
 ## Environment variables
 
-| Variable | Used in | Description |
-|----------|---------|-------------|
-| `VITE_API_URL` | Frontend | Backend base URL |
-| `ALLOWED_ORIGINS` | Backend | Comma-separated CORS origins |
+| Variable          | Used in  | Description                  |
+| ----------------- | -------- | ---------------------------- |
+| `VITE_API_URL`    | Frontend | Backend base URL             |
+| `ALLOWED_ORIGINS` | Backend  | Comma-separated CORS origins |
 
 ## Commit style
 
@@ -69,4 +69,5 @@ Conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`
 - OSMD renders on a **white background** — wrap it in a white `bg-white` container
 - basic-pitch requires `ffmpeg` in the Docker image (audio decoding)
 - HF Spaces exposes port **7860**
+- Accepted formats: MP3, M4A, AAC, WAV (enforced in both frontend and backend)
 - Max upload size: 50 MB (enforced in both frontend hint and backend)

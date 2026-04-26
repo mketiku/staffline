@@ -12,11 +12,24 @@ export function UploadZone({ onUpload, disabled }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const ACCEPTED_TYPES = new Set([
+    'audio/mpeg',
+    'audio/mp3',
+    'audio/mp4',
+    'audio/x-m4a',
+    'audio/m4a',
+    'audio/aac',
+    'audio/x-aac',
+    'audio/wav',
+    'audio/wave',
+    'audio/x-wav',
+  ]);
+
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file?.type === 'audio/mpeg') onUpload(file);
+    if (file && ACCEPTED_TYPES.has(file.type)) onUpload(file);
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -45,7 +58,9 @@ export function UploadZone({ onUpload, disabled }: UploadZoneProps) {
       </div>
 
       <div>
-        <p className="text-lg font-medium text-ink">Drop your MP3 here</p>
+        <p className="text-lg font-medium text-ink">
+          Drop your audio file here
+        </p>
         <p className="mt-1 text-sm text-ink-dim">or browse to upload</p>
       </div>
 
@@ -54,12 +69,14 @@ export function UploadZone({ onUpload, disabled }: UploadZoneProps) {
         Browse files
       </Button>
 
-      <p className="text-xs text-ink-dim opacity-60">MP3 only · max 50 MB</p>
+      <p className="text-xs text-ink-dim opacity-60">
+        MP3, M4A, AAC, WAV · max 50 MB
+      </p>
 
       <input
         ref={inputRef}
         type="file"
-        accept=".mp3,audio/mpeg"
+        accept=".mp3,.m4a,.aac,.wav,audio/mpeg,audio/mp4,audio/aac,audio/wav"
         className="hidden"
         onChange={handleChange}
       />
