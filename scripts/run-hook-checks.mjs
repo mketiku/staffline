@@ -17,7 +17,7 @@ const stepsByMode = {
       { label: 'lint', command: 'bun', args: ['run', 'lint'] },
       { label: 'typecheck', command: 'bun', args: ['run', 'typecheck'] },
     ],
-    { label: 'tests', command: 'bun', args: ['run', 'test:run'] },
+    { label: 'tests', command: 'bunx', args: ['vitest', 'run', '--passWithNoTests'] },
   ],
 };
 
