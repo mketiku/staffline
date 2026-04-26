@@ -25,10 +25,10 @@ bun dev
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn main:app --reload
+uvicorn main:app --reload --port 8100
 ```
 
-Set `VITE_API_URL=http://localhost:8000` in `.env.local`.
+Set `VITE_API_URL=http://localhost:8100` in `.env.local`.
 
 ## Deployment
 

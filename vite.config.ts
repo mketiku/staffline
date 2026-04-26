@@ -5,6 +5,7 @@ import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: { port: 5274 },
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
