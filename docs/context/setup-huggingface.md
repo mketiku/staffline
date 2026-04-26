@@ -22,10 +22,10 @@ The backend lives at `~/Projects/staffline/backend/` — its own git repo.
 
 ```bash
 cd ../backend
-git remote add hf https://huggingface.co/spaces/mketiku/staffline-api
+git remote add hf git@hf.co:spaces/mketiku/staffline-api
 ```
 
-When prompted for credentials: username = HF username, password = HF token.
+Requires an SSH key added to your HF account (Settings → SSH Keys).
 
 ## 4. Push
 
