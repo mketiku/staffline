@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Scissors, Music2 } from 'lucide-react';
+import { Scissors, Music2, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import {
   decodeAudio,
@@ -23,9 +23,28 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
   const [duration, setDuration] = useState(0);
   const [start, setStart] = useState(0);
   const [end, setEnd] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef<'start' | 'end' | null>(null);
+
+  // Audio playback — all via refs to avoid re-renders per frame
+  const playheadRef = useRef<SVGLineElement>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const rafRef = useRef<number>(0);
+  const startedAtRef = useRef<number>(0);
+  const playOffsetRef = useRef<number>(0);
+  const isPlayingRef = useRef(false);
+
+  // Mirror state in refs so stable callbacks always read fresh values
+  const startRef = useRef(0);
+  const endRef = useRef(0);
+  startRef.current = start;
+  endRef.current = end;
+
+  // Latest togglePlay for the keydown handler (avoids stale closure)
+  const togglePlayRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     decodeAudio(file)
@@ -41,6 +60,101 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
       });
   }, [file, onConfirm]);
 
+  useEffect(() => {
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      try {
+        sourceRef.current?.stop();
+      } catch {
+        // stop() throws if the source already ended naturally
+      }
+      audioCtxRef.current?.close();
+    };
+  }, []);
+
+  function stopPlayback() {
+    cancelAnimationFrame(rafRef.current);
+    try {
+      sourceRef.current?.stop();
+    } catch {
+      // stop() throws if the source already ended naturally
+    }
+    sourceRef.current = null;
+    isPlayingRef.current = false;
+    setIsPlaying(false);
+    if (playheadRef.current) {
+      playheadRef.current.setAttribute('x1', '-1');
+      playheadRef.current.setAttribute('x2', '-1');
+    }
+  }
+
+  function play() {
+    const buffer = bufferRef.current;
+    if (!buffer) return;
+
+    const ctx = audioCtxRef.current ?? new AudioContext();
+    audioCtxRef.current = ctx;
+    if (ctx.state === 'suspended') ctx.resume();
+
+    const playStart = startRef.current;
+    const playEnd = endRef.current;
+    const bufDuration = buffer.duration;
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start(0, playStart, playEnd - playStart);
+
+    sourceRef.current = source;
+    startedAtRef.current = ctx.currentTime;
+    playOffsetRef.current = playStart;
+    isPlayingRef.current = true;
+    setIsPlaying(true);
+
+    function tick() {
+      if (!isPlayingRef.current || !audioCtxRef.current) return;
+      const elapsed = audioCtxRef.current.currentTime - startedAtRef.current;
+      const pos = playOffsetRef.current + elapsed;
+      if (pos >= playEnd || pos >= bufDuration) {
+        stopPlayback();
+        return;
+      }
+      if (playheadRef.current) {
+        const x = String((pos / bufDuration) * WAVEFORM_POINTS);
+        playheadRef.current.setAttribute('x1', x);
+        playheadRef.current.setAttribute('x2', x);
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    }
+    rafRef.current = requestAnimationFrame(tick);
+
+    source.onended = () => {
+      if (sourceRef.current === source) stopPlayback();
+    };
+  }
+
+  function togglePlay() {
+    if (isPlayingRef.current) stopPlayback();
+    else play();
+  }
+  togglePlayRef.current = togglePlay;
+
+  useEffect(() => {
+    if (status !== 'ready') return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.code !== 'Space') return;
+      if (
+        e.target instanceof HTMLButtonElement ||
+        e.target instanceof HTMLInputElement
+      )
+        return;
+      e.preventDefault();
+      togglePlayRef.current();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [status]);
+
   function timeToX(t: number) {
     return duration > 0 ? (t / duration) * 100 : 0;
   }
@@ -55,6 +169,7 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
 
   function handlePointerDown(e: React.PointerEvent, handle: 'start' | 'end') {
     e.preventDefault();
+    if (isPlayingRef.current) stopPlayback();
     dragging.current = handle;
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
   }
@@ -80,6 +195,7 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
   }
 
   async function handleConfirm(useFullTrack: boolean) {
+    stopPlayback();
     const buffer = bufferRef.current;
     if (!buffer || useFullTrack || (start <= 0.05 && end >= duration - 0.05)) {
       onConfirm(file);
@@ -91,6 +207,11 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
       type: 'audio/wav',
     });
     onConfirm(trimmedFile);
+  }
+
+  function handleCancel() {
+    stopPlayback();
+    onCancel();
   }
 
   const selectionDuration = end - start;
@@ -108,7 +229,7 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
           </p>
         </div>
         <button
-          onClick={onCancel}
+          onClick={handleCancel}
           className="cursor-pointer text-xs text-ink-dim hover:text-ink"
         >
           Cancel
@@ -168,12 +289,33 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
               fill="oklch(10% 0.02 265 / 0.7)"
             />
 
+            {/* Playhead — position updated directly via ref, hidden at x=-1 */}
+            <line
+              ref={playheadRef}
+              x1={-1}
+              y1={0}
+              x2={-1}
+              y2={60}
+              stroke="white"
+              strokeWidth={0.5}
+              strokeOpacity={0.9}
+              style={{ pointerEvents: 'none' }}
+            />
+
             {/* Start handle */}
             <g
               onPointerDown={(e) => handlePointerDown(e, 'start')}
               className="cursor-ew-resize"
               style={{ touchAction: 'none' }}
             >
+              {/* Wider invisible hit area */}
+              <rect
+                x={timeToX(start) - 4}
+                y={0}
+                width={8}
+                height={60}
+                fill="transparent"
+              />
               <line
                 x1={timeToX(start)}
                 y1={0}
@@ -196,6 +338,14 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
               className="cursor-ew-resize"
               style={{ touchAction: 'none' }}
             >
+              {/* Wider invisible hit area */}
+              <rect
+                x={timeToX(end) - 4}
+                y={0}
+                width={8}
+                height={60}
+                fill="transparent"
+              />
               <line
                 x1={timeToX(end)}
                 y1={0}
@@ -213,15 +363,29 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
             </g>
           </svg>
 
-          {/* Time labels */}
-          <div className="mt-2 flex justify-between text-xs tabular-nums text-ink-dim">
-            <span>{formatTime(start)}</span>
-            <span className="text-ink">
-              {isFullTrack
-                ? 'Full track'
-                : `${formatTime(selectionDuration)} selected`}
-            </span>
-            <span>{formatTime(end)}</span>
+          {/* Playback control + time labels */}
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              onClick={togglePlay}
+              className="flex h-7 w-7 flex-shrink-0 cursor-pointer items-center justify-center rounded-full bg-surface-raised text-ink-dim transition-colors hover:text-gold"
+              title="Play selection (Space)"
+              aria-label={isPlaying ? 'Pause' : 'Play selection'}
+            >
+              {isPlaying ? (
+                <Pause className="h-3.5 w-3.5" />
+              ) : (
+                <Play className="h-3.5 w-3.5" />
+              )}
+            </button>
+            <div className="flex flex-1 justify-between text-xs tabular-nums text-ink-dim">
+              <span>{formatTime(start)}</span>
+              <span className="text-ink">
+                {isFullTrack
+                  ? 'Full track'
+                  : `${formatTime(selectionDuration)} selected`}
+              </span>
+              <span>{formatTime(end)}</span>
+            </div>
           </div>
 
           {/* Actions */}
