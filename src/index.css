@@ -23,6 +23,20 @@
   --font-sans: 'Inter', system-ui, sans-serif;
 }
 
+/* WaveSurfer region handles */
+[part~='region-handle-left'],
+[part~='region-handle-right'] {
+  background-color: oklch(80% 0.15 75) !important;
+  width: 3px !important;
+  border-radius: 2px;
+  opacity: 1 !important;
+}
+
+[part~='region'] {
+  border-top: 1px solid oklch(80% 0.15 75 / 0.4);
+  border-bottom: 1px solid oklch(80% 0.15 75 / 0.4);
+}
+
 *,
 *::before,
 *::after {
