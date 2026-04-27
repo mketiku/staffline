@@ -60,6 +60,15 @@ vi.mock('wavesurfer.js/dist/plugins/regions.esm.js', () => {
   };
 });
 
+vi.mock('@/lib/audio.worker?worker', () => ({
+  default: class {
+    onmessage: null = null;
+    onerror: null = null;
+    postMessage() {}
+    terminate() {}
+  },
+}));
+
 // Silence URL.createObjectURL / revokeObjectURL in jsdom
 beforeEach(() => {
   vi.stubGlobal('URL', {

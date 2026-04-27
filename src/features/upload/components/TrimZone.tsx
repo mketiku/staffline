@@ -5,7 +5,7 @@ import RegionsPlugin, {
 } from 'wavesurfer.js/dist/plugins/regions.esm.js';
 import { Scissors, Music2, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { sliceAudio, encodeWAV } from '@/lib/audio';
+import AudioWorker from '@/lib/audio.worker?worker';
 
 interface TrimZoneProps {
   file: File;
@@ -46,7 +46,10 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
   const onConfirmRef = useRef(onConfirm);
   onConfirmRef.current = onConfirm;
 
-  const [status, setStatus] = useState<'loading' | 'ready'>('loading');
+  const workerRef = useRef<Worker | null>(null);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'slicing'>(
+    'loading'
+  );
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [start, setStart] = useState(0);
@@ -131,6 +134,15 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
     };
   }, [file]);
 
+  useEffect(() => {
+    const worker = new AudioWorker();
+    workerRef.current = worker;
+    return () => {
+      worker.terminate();
+      workerRef.current = null;
+    };
+  }, []);
+
   // Spacebar shortcut
   useEffect(() => {
     if (status !== 'ready') return;
@@ -182,23 +194,42 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
     else region.play();
   }
 
-  async function handleConfirm(useFullTrack: boolean) {
+  function handleConfirm(useFullTrack: boolean) {
     wsRef.current?.pause();
     if (useFullTrack || (start <= 0.05 && end >= duration - 0.05)) {
-      onConfirm(file);
+      onConfirmRef.current(file);
       return;
     }
     const buffer = wsRef.current?.getDecodedData();
-    if (!buffer) {
-      onConfirm(file);
+    if (!buffer || !workerRef.current) {
+      onConfirmRef.current(file);
       return;
     }
-    const sliced = sliceAudio(buffer, start, end);
-    const wav = encodeWAV(sliced);
-    const trimmedFile = new File([wav], file.name.replace(/\.[^.]+$/, '.wav'), {
-      type: 'audio/wav',
-    });
-    onConfirm(trimmedFile);
+
+    const channels = Array.from({ length: buffer.numberOfChannels }, (_, ch) =>
+      buffer.getChannelData(ch).slice()
+    );
+
+    setStatus('slicing');
+
+    const worker = workerRef.current;
+    worker.onmessage = (e: MessageEvent<ArrayBuffer>) => {
+      const blob = new Blob([e.data], { type: 'audio/wav' });
+      const trimmedFile = new File(
+        [blob],
+        file.name.replace(/\.[^.]+$/, '.wav'),
+        { type: 'audio/wav' }
+      );
+      onConfirmRef.current(trimmedFile);
+    };
+    worker.onerror = () => {
+      onConfirmRef.current(file);
+    };
+
+    worker.postMessage(
+      { channels, sampleRate: buffer.sampleRate, startSec: start, endSec: end },
+      channels.map((ch) => ch.buffer)
+    );
   }
 
   function handleCancel() {
@@ -241,13 +272,14 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
         )}
       </div>
 
-      {status === 'ready' && (
+      {(status === 'ready' || status === 'slicing') && (
         <>
           {/* Playback + editable timestamps */}
           <div className="mt-3 flex items-center gap-2">
             <button
               onClick={handleTogglePlay}
-              className="flex h-7 w-7 flex-shrink-0 cursor-pointer items-center justify-center rounded-full bg-surface-raised text-ink-dim transition-colors hover:text-gold"
+              disabled={status === 'slicing'}
+              className="flex h-7 w-7 flex-shrink-0 cursor-pointer items-center justify-center rounded-full bg-surface-raised text-ink-dim transition-colors hover:text-gold disabled:pointer-events-none disabled:opacity-40"
               title="Play selection (Space)"
               aria-label={isPlaying ? 'Pause' : 'Play selection'}
             >
@@ -297,21 +329,30 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
 
           {/* Actions */}
           <div className="mt-4 flex gap-2">
-            <Button
-              variant="primary"
-              onClick={() => handleConfirm(false)}
-              className="flex-1"
-            >
-              <Scissors className="h-4 w-4" />
-              {isFullTrack
-                ? 'Transcribe full track'
-                : `Transcribe selection (${formatTime(selectionDuration)})`}
-            </Button>
-            {!isFullTrack && (
-              <Button variant="ghost" onClick={() => handleConfirm(true)}>
-                <Music2 className="h-4 w-4" />
-                Use full track
-              </Button>
+            {status === 'slicing' ? (
+              <div className="flex flex-1 items-center justify-center gap-2 py-2 text-sm text-ink-dim">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-gold" />
+                Encoding audio…
+              </div>
+            ) : (
+              <>
+                <Button
+                  variant="primary"
+                  onClick={() => handleConfirm(false)}
+                  className="flex-1"
+                >
+                  <Scissors className="h-4 w-4" />
+                  {isFullTrack
+                    ? 'Transcribe full track'
+                    : `Transcribe selection (${formatTime(selectionDuration)})`}
+                </Button>
+                {!isFullTrack && (
+                  <Button variant="ghost" onClick={() => handleConfirm(true)}>
+                    <Music2 className="h-4 w-4" />
+                    Use full track
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </>
