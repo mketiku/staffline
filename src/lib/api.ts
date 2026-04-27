@@ -1,4 +1,6 @@
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+// In local dev (no VITE_API_URL set), requests hit the same origin and are
+// proxied to localhost:8000 by Vite — no CORS required.
+const API_URL = import.meta.env.VITE_API_URL ?? '';
 
 export type TranscribeStage =
   | { stage: 'validating'; pct: number }

@@ -49,3 +49,23 @@ body {
   color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
 }
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  main {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  .print-sheet {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+}

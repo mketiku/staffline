@@ -1,11 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Music, RotateCcw } from 'lucide-react';
+import { Music, RotateCcw, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { UploadZone } from '@/features/upload/components/UploadZone';
 import { TrimZone } from '@/features/upload/components/TrimZone';
 import { SheetMusic } from '@/features/transcription/components/SheetMusic';
 import { transcribeAudioStream, type TranscribeStage } from '@/lib/api';
 import { hashFile, transcriptionCache } from '@/lib/audio';
+import {
+  loadHistory,
+  saveToHistory,
+  removeFromHistory,
+  formatRelativeDate,
+  type HistoryEntry,
+} from '@/lib/history';
 import { Button } from '@/components/ui/Button';
 
 const STAGE_LABELS: Record<string, string> = {
@@ -38,7 +45,7 @@ type AppState =
   | { status: 'idle' }
   | { status: 'trimming'; file: File }
   | { status: 'loading'; filename: string; stage: LoadingStage; pct: number }
-  | { status: 'success'; musicxml: string; filename: string; file: File }
+  | { status: 'success'; musicxml: string; filename: string; file: File | null }
   | { status: 'error'; message: string };
 
 function useCyclingFact() {
@@ -60,10 +67,25 @@ function useCyclingFact() {
 
 export default function App() {
   const [state, setState] = useState<AppState>({ status: 'idle' });
+  const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
   const { fact, key: factKey } = useCyclingFact();
 
   function handleFile(file: File) {
     setState({ status: 'trimming', file });
+  }
+
+  function handleLoadFromHistory(entry: HistoryEntry) {
+    setState({
+      status: 'success',
+      musicxml: entry.musicxml,
+      filename: entry.filename,
+      file: null,
+    });
+  }
+
+  function handleRemoveFromHistory(hash: string) {
+    removeFromHistory(hash);
+    setHistory((h) => h.filter((e) => e.hash !== hash));
   }
 
   async function handleTrim(fileToUpload: File) {
@@ -96,6 +118,8 @@ export default function App() {
     try {
       const musicxml = await transcribeAudioStream(fileToUpload, onStage);
       transcriptionCache.set(hash, musicxml);
+      saveToHistory({ filename, hash, musicxml });
+      setHistory(loadHistory());
       setState({ status: 'success', musicxml, filename, file: fileToUpload });
     } catch (err) {
       setState({
@@ -107,7 +131,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-canvas text-ink">
-      <header className="border-b border-line px-6 py-4">
+      <header className="no-print border-b border-line px-6 py-4">
         <div className="mx-auto flex max-w-5xl items-center gap-2.5">
           <Music className="h-5 w-5 text-gold" />
           <span className="font-semibold tracking-tight">stafflines</span>
@@ -134,6 +158,41 @@ export default function App() {
                 </p>
               </div>
               <UploadZone onUpload={handleFile} />
+
+              {history.length > 0 && (
+                <div className="mt-10">
+                  <p className="mb-3 text-sm font-medium text-ink-dim">
+                    Recent
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {history.slice(0, 5).map((entry) => (
+                      <div
+                        key={entry.hash}
+                        className="group flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3 transition-colors hover:border-gold-dim hover:bg-surface-raised"
+                      >
+                        <button
+                          onClick={() => handleLoadFromHistory(entry)}
+                          className="flex min-w-0 flex-1 cursor-pointer flex-col items-start text-left"
+                        >
+                          <span className="w-full truncate text-sm font-medium text-ink">
+                            {entry.filename}
+                          </span>
+                          <span className="text-xs text-ink-dim">
+                            {formatRelativeDate(entry.date)}
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => handleRemoveFromHistory(entry.hash)}
+                          className="cursor-pointer p-1 text-ink-dim opacity-0 transition-opacity hover:text-error group-hover:opacity-100"
+                          aria-label="Remove from history"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -209,7 +268,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
             >
-              <div className="mb-6 flex items-center justify-between">
+              <div className="no-print mb-6 flex items-center justify-between">
                 <div>
                   <p className="font-medium text-ink">{state.filename}</p>
                   <p className="text-sm text-ink-dim">Sheet music generated</p>
@@ -224,7 +283,7 @@ export default function App() {
               </div>
               <SheetMusic
                 musicxml={state.musicxml}
-                audioFile={state.file}
+                audioFile={state.file ?? undefined}
                 filename={state.filename}
               />
             </motion.div>

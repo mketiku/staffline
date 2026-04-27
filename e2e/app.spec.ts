@@ -295,6 +295,35 @@ test.describe('stafflines', () => {
     ).toBeVisible();
   });
 
+  test('error state is shown when SSE stream emits an error stage', async ({
+    page,
+  }) => {
+    const SSE_ERROR =
+      [
+        `data: ${JSON.stringify({ stage: 'validating', pct: 5 })}`,
+        `data: ${JSON.stringify({ stage: 'analyzing', pct: 15 })}`,
+        `data: ${JSON.stringify({ stage: 'error', pct: 0, detail: 'Transcription backend unavailable' })}`,
+      ].join('\n\n') + '\n\n';
+
+    await page.route('**/transcribe/stream', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: SSE_ERROR,
+      })
+    );
+
+    await uploadViaInput(page);
+    await confirmTranscription(page);
+
+    await expect(
+      page.getByText('Transcription backend unavailable')
+    ).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByRole('button', { name: /Try again/i })
+    ).toBeVisible();
+  });
+
   test('try again from error state resets to idle', async ({ page }) => {
     await page.route('**/transcribe/stream', (route) =>
       route.fulfill({
