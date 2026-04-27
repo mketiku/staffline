@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Dark background matching canvas color -->
+  <rect width="32" height="32" rx="7" fill="#0e0e1c"/>
+  <!-- Staff lines (dimmed gold) -->
+  <line x1="5" y1="13" x2="27" y2="13" stroke="#c8a028" stroke-width="1" opacity="0.4"/>
+  <line x1="5" y1="17" x2="27" y2="17" stroke="#c8a028" stroke-width="1" opacity="0.4"/>
+  <line x1="5" y1="21" x2="27" y2="21" stroke="#c8a028" stroke-width="1" opacity="0.4"/>
+  <!-- Note head on middle line -->
+  <ellipse cx="13" cy="17" rx="4.2" ry="3" transform="rotate(-20 13 17)" fill="#c8a028"/>
+  <!-- Stem -->
+  <line x1="16.8" y1="16" x2="16.8" y2="7" stroke="#c8a028" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- Flag -->
+  <path d="M16.8 7 C22 9 23 14 18 19" stroke="#c8a028" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+</svg>

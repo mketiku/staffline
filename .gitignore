@@ -24,6 +24,10 @@ dist
 # test / coverage
 coverage
 playwright-report
+test-results
 
 # vercel
 .vercel
+
+# Daily planning — local scratch file
+PLAN_OF_DAY.md
