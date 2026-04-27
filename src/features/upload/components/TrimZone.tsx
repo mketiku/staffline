@@ -40,6 +40,11 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WaveSurfer | null>(null);
   const regionRef = useRef<Region | null>(null);
+  // Keep the latest onConfirm without it being an effect dependency — prevents
+  // WaveSurfer from being destroyed/recreated when the parent re-renders with
+  // a new callback reference (e.g. from useCyclingFact in App).
+  const onConfirmRef = useRef(onConfirm);
+  onConfirmRef.current = onConfirm;
 
   const [status, setStatus] = useState<'loading' | 'ready'>('loading');
   const [isPlaying, setIsPlaying] = useState(false);
@@ -60,6 +65,7 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
   useEffect(() => {
     if (!containerRef.current) return;
 
+    let mounted = true;
     const objectUrl = URL.createObjectURL(file);
     const regions = RegionsPlugin.create();
 
@@ -79,6 +85,8 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
     wsRef.current = ws;
 
     ws.on('ready', (dur) => {
+      URL.revokeObjectURL(objectUrl);
+      if (!mounted) return;
       durationRef.current = dur;
       setDuration(dur);
       setEnd(dur);
@@ -105,7 +113,8 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
     });
 
     ws.on('error', () => {
-      onConfirm(file);
+      URL.revokeObjectURL(objectUrl);
+      if (mounted) onConfirmRef.current(file);
     });
 
     ws.on('play', () => setIsPlaying(true));
@@ -113,10 +122,14 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
     ws.on('finish', () => setIsPlaying(false));
 
     return () => {
+      mounted = false;
       ws.destroy();
-      URL.revokeObjectURL(objectUrl);
+      // Intentionally not revoking objectUrl here: WaveSurfer fetches the blob
+      // asynchronously, so revoking before the fetch starts (e.g. in React
+      // StrictMode double-invoke) causes ERR_FILE_NOT_FOUND. The URL is revoked
+      // in the 'ready' and 'error' handlers once WaveSurfer is done with it.
     };
-  }, [file, onConfirm]);
+  }, [file]);
 
   // Spacebar shortcut
   useEffect(() => {

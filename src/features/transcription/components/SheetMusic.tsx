@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { OpenSheetMusicDisplay } from 'opensheetmusicdisplay';
-import { Loader2, Play, Pause, Download, FileCode2 } from 'lucide-react';
+import {
+  Loader2,
+  Play,
+  Pause,
+  Download,
+  FileCode2,
+  Printer,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
@@ -35,13 +42,15 @@ export function SheetMusic({ musicxml, audioFile, filename }: SheetMusicProps) {
   const [duration, setDuration] = useState(0);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
 
+    let mounted = true;
     setIsRendering(true);
     setRenderError(null);
-    containerRef.current.innerHTML = '';
+    container.innerHTML = '';
 
-    const osmd = new OpenSheetMusicDisplay(containerRef.current, {
+    const osmd = new OpenSheetMusicDisplay(container, {
       autoResize: true,
       drawTitle: true,
     });
@@ -49,15 +58,22 @@ export function SheetMusic({ musicxml, audioFile, filename }: SheetMusicProps) {
     osmd
       .load(musicxml)
       .then(() => {
+        if (!mounted) return;
         osmd.render();
         setIsRendering(false);
       })
       .catch((err: unknown) => {
+        if (!mounted) return;
         setRenderError(
           err instanceof Error ? err.message : 'Failed to render sheet music'
         );
         setIsRendering(false);
       });
+
+    return () => {
+      mounted = false;
+      container.innerHTML = '';
+    };
   }, [musicxml]);
 
   useEffect(() => {
@@ -144,7 +160,10 @@ export function SheetMusic({ musicxml, audioFile, filename }: SheetMusicProps) {
   return (
     <div className="flex flex-col gap-4">
       <div
-        className={cn('flex items-center gap-3', isRendering && 'invisible')}
+        className={cn(
+          'no-print flex items-center gap-3',
+          isRendering && 'invisible'
+        )}
       >
         {audioFile && (
           <div className="flex flex-1 items-center gap-3 rounded-xl border border-line bg-surface px-4 py-2.5">
@@ -186,10 +205,14 @@ export function SheetMusic({ musicxml, audioFile, filename }: SheetMusicProps) {
             <Download className="h-4 w-4" />
             SVG
           </Button>
+          <Button variant="ghost" onClick={() => window.print()}>
+            <Printer className="h-4 w-4" />
+            Print
+          </Button>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl bg-white shadow-lg">
+      <div className="print-sheet overflow-hidden rounded-2xl bg-white shadow-lg">
         {isRendering && (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-gray-300" />
