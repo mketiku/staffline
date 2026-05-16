@@ -1,0 +1,29 @@
+name: Rollback Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Reason for rollback (required for audit trail)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    name: Roll back to previous deployment
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Install Vercel CLI
+        run: npm install -g vercel@52
+      - name: Roll back
+        run: |
+          echo "Rolling back. Reason: ${{ inputs.reason }}"
+          vercel rollback --token=${{ secrets.VERCEL_TOKEN }} --yes
+      - name: Confirm active deployment
+        run: vercel ls --token=${{ secrets.VERCEL_TOKEN }} | head -5
