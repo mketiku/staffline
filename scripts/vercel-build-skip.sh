@@ -9,7 +9,7 @@ if echo "$COMMIT_MSG" | grep -qF "[skip vercel]"; then
   exit 0
 fi
 
-if git diff HEAD^ HEAD --name-only | grep -qE \
+if git diff "${VERCEL_GIT_PREVIOUS_SHA:-HEAD^}" HEAD --name-only | grep -qE \
   '^(src/|public/|index\.html|vite\.config\.|package\.json|bun\.lock|vercel\.json)'; then
   echo "Building: app code changed"
   exit 1
