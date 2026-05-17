@@ -24,7 +24,14 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     exclude: ['**/node_modules/**', '**/e2e/**'],
     coverage: {
-      provider: 'v8',
+      provider: 'istanbul',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/main.tsx',
+        'src/lib/audio.worker.ts',
+        'src/test/**',
+        '**/*.d.ts',
+      ],
       thresholds: { lines: 70, statements: 70, branches: 70, functions: 60 },
     },
   },

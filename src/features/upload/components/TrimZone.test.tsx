@@ -1,4 +1,4 @@
-import { render, act } from '@testing-library/react';
+import { render, act, screen, fireEvent } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { TrimZone } from './TrimZone';
 
@@ -43,22 +43,23 @@ vi.mock('wavesurfer.js', () => ({
   },
 }));
 
-vi.mock('wavesurfer.js/dist/plugins/regions.esm.js', () => {
-  const mockRegion = {
+const { mockRegion } = vi.hoisted(() => ({
+  mockRegion: {
     on: vi.fn(),
     play: vi.fn(),
     setOptions: vi.fn(),
     start: 0,
     end: 10,
-  };
-  return {
-    default: {
-      create: vi.fn(() => ({
-        addRegion: vi.fn(() => mockRegion),
-      })),
-    },
-  };
-});
+  },
+}));
+
+vi.mock('wavesurfer.js/dist/plugins/regions.esm.js', () => ({
+  default: {
+    create: vi.fn(() => ({
+      addRegion: vi.fn(() => mockRegion),
+    })),
+  },
+}));
 
 vi.mock('@/lib/audio.worker?worker', () => ({
   default: class {
@@ -77,9 +78,24 @@ beforeEach(() => {
   });
   createCallCount.count = 0;
   lastWsInstance = null;
+  mockRegion.on.mockReset();
+  mockRegion.play.mockReset();
+  mockRegion.setOptions.mockReset();
+  mockRegion.start = 0;
+  mockRegion.end = 10;
 });
 
 const mockFile = new File(['audio'], 'test.mp3', { type: 'audio/mpeg' });
+
+async function renderReady(onConfirm = vi.fn(), onCancel = vi.fn()) {
+  const utils = render(
+    <TrimZone file={mockFile} onConfirm={onConfirm} onCancel={onCancel} />
+  );
+  await act(async () => {
+    lastWsInstance?.emit('ready', 10);
+  });
+  return { ...utils, onConfirm, onCancel };
+}
 
 describe('TrimZone', () => {
   it('does not recreate WaveSurfer when onConfirm reference changes', async () => {
@@ -131,5 +147,157 @@ describe('TrimZone', () => {
     });
 
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  describe('after ready', () => {
+    it('clicking play calls region.play() when not already playing', async () => {
+      await renderReady();
+      const playBtn = screen.getByRole('button', { name: 'Play selection' });
+      await act(async () => {
+        fireEvent.click(playBtn);
+      });
+      expect(mockRegion.play).toHaveBeenCalledTimes(1);
+    });
+
+    it('ws play event sets isPlaying — Pause icon appears', async () => {
+      await renderReady();
+      await act(async () => {
+        lastWsInstance?.emit('play');
+      });
+      expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+    });
+
+    it('ws pause event restores Play icon', async () => {
+      await renderReady();
+      await act(async () => {
+        lastWsInstance?.emit('play');
+      });
+      await act(async () => {
+        lastWsInstance?.emit('pause');
+      });
+      expect(
+        screen.getByRole('button', { name: 'Play selection' })
+      ).toBeInTheDocument();
+    });
+
+    it('ws finish event restores Play icon', async () => {
+      await renderReady();
+      await act(async () => {
+        lastWsInstance?.emit('play');
+      });
+      await act(async () => {
+        lastWsInstance?.emit('finish');
+      });
+      expect(
+        screen.getByRole('button', { name: 'Play selection' })
+      ).toBeInTheDocument();
+    });
+
+    it('clicking Cancel calls ws.pause() and invokes onCancel', async () => {
+      const { onCancel } = await renderReady();
+      const cancelBtn = screen.getByRole('button', { name: /cancel/i });
+      await act(async () => {
+        fireEvent.click(cancelBtn);
+      });
+      expect(lastWsInstance?.pause).toHaveBeenCalled();
+      expect(onCancel).toHaveBeenCalledTimes(1);
+    });
+
+    it('clicking "Transcribe full track" calls onConfirm(file) directly (isFullTrack path)', async () => {
+      const { onConfirm } = await renderReady();
+      const confirmBtn = screen.getByRole('button', {
+        name: /transcribe full track/i,
+      });
+      await act(async () => {
+        fireEvent.click(confirmBtn);
+      });
+      expect(onConfirm).toHaveBeenCalledWith(mockFile);
+    });
+
+    it('handleConfirm with non-full-track region and no decoded data calls onConfirm(file)', async () => {
+      const { onConfirm } = await renderReady();
+
+      // Simulate region drag — fire the update-end handler captured by region.on
+      mockRegion.start = 1;
+      mockRegion.end = 8;
+      const updateEndCall = mockRegion.on.mock.calls.find(
+        (args: unknown[]) => args[0] === 'update-end'
+      );
+      expect(updateEndCall).toBeDefined();
+      await act(async () => {
+        updateEndCall![1]();
+      });
+
+      // getDecodedData returns null (default), so falls back to onConfirm(file)
+      const confirmBtn = screen.getByRole('button', {
+        name: /transcribe selection/i,
+      });
+      await act(async () => {
+        fireEvent.click(confirmBtn);
+      });
+      expect(onConfirm).toHaveBeenCalledWith(mockFile);
+    });
+
+    it('blurring start input with "0:05" calls setOptions with start=5', async () => {
+      await renderReady();
+      const startInput = screen.getByRole('textbox', { name: 'Start time' });
+      await act(async () => {
+        fireEvent.change(startInput, { target: { value: '0:05' } });
+        fireEvent.blur(startInput);
+      });
+      expect(mockRegion.setOptions).toHaveBeenCalledWith(
+        expect.objectContaining({ start: 5 })
+      );
+    });
+
+    it('blurring end input with "0:05" calls setOptions with end=5', async () => {
+      await renderReady();
+      const endInput = screen.getByRole('textbox', { name: 'End time' });
+      await act(async () => {
+        fireEvent.change(endInput, { target: { value: '0:05' } });
+        fireEvent.blur(endInput);
+      });
+      expect(mockRegion.setOptions).toHaveBeenCalledWith(
+        expect.objectContaining({ end: 5 })
+      );
+    });
+
+    it('parseTimeInput: plain seconds "90" sets start=90 (clamped to end-0.5)', async () => {
+      await renderReady();
+      const startInput = screen.getByRole('textbox', { name: 'Start time' });
+      await act(async () => {
+        fireEvent.change(startInput, { target: { value: '90' } });
+        fireEvent.blur(startInput);
+      });
+      // duration=10, so max clamped start = end(10) - 0.5 = 9.5
+      expect(mockRegion.setOptions).toHaveBeenCalledWith(
+        expect.objectContaining({ start: 9.5 })
+      );
+    });
+
+    it('parseTimeInput: empty string resets start to current value', async () => {
+      await renderReady();
+      const startInput = screen.getByRole('textbox', { name: 'Start time' });
+      await act(async () => {
+        fireEvent.change(startInput, { target: { value: '' } });
+        fireEvent.blur(startInput);
+      });
+      // null result → keeps startRef.current (0)
+      expect(mockRegion.setOptions).toHaveBeenCalledWith(
+        expect.objectContaining({ start: 0 })
+      );
+    });
+
+    it('parseTimeInput: invalid string "abc" resets start to current value', async () => {
+      await renderReady();
+      const startInput = screen.getByRole('textbox', { name: 'Start time' });
+      await act(async () => {
+        fireEvent.change(startInput, { target: { value: 'abc' } });
+        fireEvent.blur(startInput);
+      });
+      expect(mockRegion.setOptions).toHaveBeenCalledWith(
+        expect.objectContaining({ start: 0 })
+      );
+    });
   });
 });
