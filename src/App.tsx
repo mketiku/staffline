@@ -1,9 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Music, RotateCcw, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { UploadZone } from '@/features/upload/components/UploadZone';
 import { TrimZone } from '@/features/upload/components/TrimZone';
-import { SheetMusic } from '@/features/transcription/components/SheetMusic';
+const SheetMusic = lazy(() =>
+  import('@/features/transcription/components/SheetMusic').then((m) => ({
+    default: m.SheetMusic,
+  }))
+);
 import { transcribeAudioStream, type TranscribeStage } from '@/lib/api';
 import { hashFile, transcriptionCache } from '@/lib/audio';
 import {
@@ -281,11 +285,13 @@ export default function App() {
                   Try another
                 </Button>
               </div>
-              <SheetMusic
-                musicxml={state.musicxml}
-                audioFile={state.file ?? undefined}
-                filename={state.filename}
-              />
+              <Suspense fallback={null}>
+                <SheetMusic
+                  musicxml={state.musicxml}
+                  audioFile={state.file ?? undefined}
+                  filename={state.filename}
+                />
+              </Suspense>
             </motion.div>
           )}
 

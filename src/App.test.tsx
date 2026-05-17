@@ -141,7 +141,7 @@ describe('App — idle state', () => {
     expect(screen.getByText('old-track.mp3')).toBeInTheDocument();
   });
 
-  it('clicking a history entry shows the success state', () => {
+  it('clicking a history entry shows the success state', async () => {
     vi.mocked(loadHistory).mockReturnValue([
       {
         filename: 'old-track.mp3',
@@ -152,7 +152,7 @@ describe('App — idle state', () => {
     ]);
     renderApp();
     fireEvent.click(screen.getByText('old-track.mp3'));
-    expect(screen.getByTestId('sheet-music')).toBeInTheDocument();
+    await screen.findByTestId('sheet-music');
     expect(screen.getByTestId('sm-musicxml').textContent).toBe('<saved-xml/>');
   });
 
