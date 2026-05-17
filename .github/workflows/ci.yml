@@ -226,12 +226,16 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
       - name: Smoke test
         id: smoke
+        env:
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           BASE="https://stafflines.mketiku.com"
           fail=0
           check() {
             local url="$1" expect="$2"
-            status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$url")
+            local extra_headers=()
+            [[ -n "$BYPASS_SECRET" ]] && extra_headers+=(-H "x-vercel-protection-bypass: $BYPASS_SECRET")
+            status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${extra_headers[@]}" "$url")
             if [[ "$expect" == *"$status"* ]]; then
               echo "✅ $url → $status"
             else
