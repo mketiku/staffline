@@ -91,7 +91,9 @@ describe('decodeAudio', () => {
     };
     vi.stubGlobal(
       'AudioContext',
-      vi.fn(() => mockCtx)
+      vi.fn(function () {
+        return mockCtx;
+      })
     );
     Object.defineProperty(File.prototype, 'arrayBuffer', {
       configurable: true,

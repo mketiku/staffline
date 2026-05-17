@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import RegionsPlugin, {
   type Region,
@@ -44,7 +44,6 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
   // WaveSurfer from being destroyed/recreated when the parent re-renders with
   // a new callback reference (e.g. from useCyclingFact in App).
   const onConfirmRef = useRef(onConfirm);
-  onConfirmRef.current = onConfirm;
 
   const workerRef = useRef<Worker | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'slicing'>(
@@ -61,9 +60,15 @@ export function TrimZone({ file, onConfirm, onCancel }: TrimZoneProps) {
   const durationRef = useRef(0);
   const startRef = useRef(0);
   const endRef = useRef(0);
-  durationRef.current = duration;
-  startRef.current = start;
-  endRef.current = end;
+
+  // Sync latest values into refs after each render (react-hooks/refs disallows
+  // mutations during render; useLayoutEffect runs before any effects read them)
+  useLayoutEffect(() => {
+    onConfirmRef.current = onConfirm;
+    durationRef.current = duration;
+    startRef.current = start;
+    endRef.current = end;
+  });
 
   useEffect(() => {
     if (!containerRef.current) return;

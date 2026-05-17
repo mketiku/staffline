@@ -41,13 +41,12 @@ function setupOsmdMock(rejectWith?: unknown) {
         : Promise.resolve(undefined)
     );
   mockRender = vi.fn();
-  vi.mocked(OpenSheetMusicDisplay).mockImplementation(
-    () =>
-      ({
-        load: mockLoad,
-        render: mockRender,
-      }) as unknown as OpenSheetMusicDisplay
-  );
+  vi.mocked(OpenSheetMusicDisplay).mockImplementation(function () {
+    return {
+      load: mockLoad,
+      render: mockRender,
+    } as unknown as OpenSheetMusicDisplay;
+  });
 }
 
 async function settle() {
@@ -212,7 +211,9 @@ describe('SheetMusic — audio event handlers', () => {
     };
     vi.stubGlobal(
       'Audio',
-      vi.fn(() => mockAudio)
+      vi.fn(function () {
+        return mockAudio;
+      })
     );
   });
   afterEach(() => {
