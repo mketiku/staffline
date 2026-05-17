@@ -55,6 +55,15 @@ describe('transcribeAudio', () => {
     );
   });
 
+  it('uses "HTTP <status>" when the error response has no detail field', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      mockResponse({ ok: false, status: 400, json: {} })
+    );
+    await expect(transcribeAudio(new File([''], 'test.mp3'))).rejects.toThrow(
+      'HTTP 400'
+    );
+  });
+
   it('throws "Unknown error" when the error response body cannot be parsed', async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: false,
@@ -121,6 +130,29 @@ describe('transcribeAudioStream', () => {
     await expect(
       transcribeAudioStream(new File([''], 'test.mp3'), vi.fn())
     ).rejects.toThrow('Unprocessable');
+  });
+
+  it('uses "HTTP <status>" when stream error response has no detail field', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      mockResponse({ ok: false, status: 503, json: {} })
+    );
+    await expect(
+      transcribeAudioStream(new File([''], 'test.mp3'), vi.fn())
+    ).rejects.toThrow('HTTP 503');
+  });
+
+  it('skips non-data SSE lines and still finds the done event', async () => {
+    const chunks = [
+      `id: 1\n\ndata: ${JSON.stringify({ stage: 'done', pct: 100, musicxml: '<score/>' })}\n\n`,
+    ];
+    vi.mocked(fetch).mockResolvedValue(
+      mockResponse({ ok: true, body: makeStream(chunks) })
+    );
+    const result = await transcribeAudioStream(
+      new File([''], 'test.mp3'),
+      vi.fn()
+    );
+    expect(result).toBe('<score/>');
   });
 
   it('throws when stream ends without a done event', async () => {

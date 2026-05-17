@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { hashFile, computeWaveform, transcriptionCache } from './audio';
+import {
+  hashFile,
+  computeWaveform,
+  transcriptionCache,
+  decodeAudio,
+} from './audio';
 
 describe('hashFile', () => {
   beforeEach(() => {
@@ -71,6 +76,33 @@ describe('computeWaveform', () => {
     const buf = makeBuffer([-0.8, -0.2, 0.1, 0.1]);
     const waveform = computeWaveform(buf, 2);
     expect(waveform[0]).toBeGreaterThan(waveform[1]);
+  });
+});
+
+describe('decodeAudio', () => {
+  it('decodes audio via AudioContext and returns an AudioBuffer', async () => {
+    const mockBuffer = {
+      numberOfChannels: 1,
+      sampleRate: 44100,
+    } as unknown as AudioBuffer;
+    const mockCtx = {
+      decodeAudioData: vi.fn().mockResolvedValue(mockBuffer),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.stubGlobal(
+      'AudioContext',
+      vi.fn(() => mockCtx)
+    );
+    Object.defineProperty(File.prototype, 'arrayBuffer', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(new ArrayBuffer(4)),
+    });
+
+    const file = new File(['audio'], 'track.mp3', { type: 'audio/mpeg' });
+    const result = await decodeAudio(file);
+    expect(result).toBe(mockBuffer);
+    expect(mockCtx.decodeAudioData).toHaveBeenCalled();
+    expect(mockCtx.close).toHaveBeenCalled();
   });
 });
 

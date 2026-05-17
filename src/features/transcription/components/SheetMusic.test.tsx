@@ -171,8 +171,6 @@ describe('SheetMusic — audio controls', () => {
       <SheetMusic musicxml={SAMPLE_XML} audioFile={audioFile} />
     );
     await settle();
-    // The play/pause button is icon-only (no text). It is the first button
-    // rendered inside the audio-player row.
     const allButtons = container.querySelectorAll('button');
     fireEvent.click(allButtons[0]);
     expect(mockPlay).toHaveBeenCalled();
@@ -183,6 +181,267 @@ describe('SheetMusic — audio controls', () => {
     await settle();
     const slider = screen.getByRole('slider');
     fireEvent.change(slider, { target: { value: '30' } });
-    // Asserts no exception is thrown; currentTime update is side-effect only.
+  });
+});
+
+describe('SheetMusic — audio event handlers', () => {
+  const audioFile = new File(['audio'], 'song.mp3', { type: 'audio/mpeg' });
+
+  type MockAudio = {
+    play: ReturnType<typeof vi.fn>;
+    pause: ReturnType<typeof vi.fn>;
+    addEventListener: ReturnType<typeof vi.fn>;
+    removeEventListener: ReturnType<typeof vi.fn>;
+    paused: boolean;
+    currentTime: number;
+    duration: number;
+  };
+
+  let mockAudio: MockAudio;
+
+  beforeEach(() => {
+    setupOsmdMock();
+    mockAudio = {
+      play: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      paused: true,
+      currentTime: 0,
+      duration: 120,
+    };
+    vi.stubGlobal(
+      'Audio',
+      vi.fn(() => mockAudio)
+    );
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      cb(performance.now());
+      return 0;
+    });
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:mock'),
+      revokeObjectURL: vi.fn(),
+    });
+  });
+
+  function getHandler(name: string): () => void {
+    const call = mockAudio.addEventListener.mock.calls.find(
+      (args: unknown[]) => args[0] === name
+    );
+    return call![1] as () => void;
+  }
+
+  it('timeupdate event updates the slider position', async () => {
+    render(<SheetMusic musicxml={SAMPLE_XML} audioFile={audioFile} />);
+    await settle();
+    // Set duration first so the slider max allows a non-zero progress value.
+    mockAudio.duration = 120;
+    act(() => getHandler('loadedmetadata')());
+    mockAudio.currentTime = 45;
+    act(() => getHandler('timeupdate')());
+    expect(screen.getByRole('slider')).toHaveValue('45');
+  });
+
+  it('loadedmetadata event updates the duration display', async () => {
+    render(<SheetMusic musicxml={SAMPLE_XML} audioFile={audioFile} />);
+    await settle();
+    mockAudio.duration = 180;
+    act(() => getHandler('loadedmetadata')());
+    expect(screen.getByRole('slider')).toHaveAttribute('max', '180');
+  });
+
+  it('ended event resets playing state and progress', async () => {
+    const { container } = render(
+      <SheetMusic musicxml={SAMPLE_XML} audioFile={audioFile} />
+    );
+    await settle();
+    mockAudio.paused = false;
+    const allButtons = container.querySelectorAll('button');
+    fireEvent.click(allButtons[0]);
+    act(() => getHandler('ended')());
+    expect(screen.getByRole('slider')).toHaveValue('0');
+  });
+
+  it('togglePlay calls audio.pause() when audio is playing', async () => {
+    const { container } = render(
+      <SheetMusic musicxml={SAMPLE_XML} audioFile={audioFile} />
+    );
+    await settle();
+    mockAudio.paused = false;
+    const allButtons = container.querySelectorAll('button');
+    fireEvent.click(allButtons[0]);
+    expect(mockAudio.pause).toHaveBeenCalled();
+  });
+
+  it('audio cleanup runs on unmount', async () => {
+    const { unmount } = render(
+      <SheetMusic musicxml={SAMPLE_XML} audioFile={audioFile} />
+    );
+    await settle();
+    unmount();
+    expect(mockAudio.pause).toHaveBeenCalled();
+    expect(mockAudio.removeEventListener).toHaveBeenCalled();
+  });
+
+  it('seeking via slider updates audio.currentTime and progress', async () => {
+    render(<SheetMusic musicxml={SAMPLE_XML} audioFile={audioFile} />);
+    await settle();
+    mockAudio.duration = 120;
+    act(() => getHandler('loadedmetadata')());
+    const slider = screen.getByRole('slider');
+    fireEvent.change(slider, { target: { value: '60' } });
+    expect(mockAudio.currentTime).toBe(60);
+    expect(slider).toHaveValue('60');
+  });
+});
+
+describe('SheetMusic — resize handler', () => {
+  beforeEach(() => setupOsmdMock());
+  afterEach(() => vi.restoreAllMocks());
+
+  it('fires OSMD render again when window is resized after initial render', async () => {
+    // Only fake setTimeout/clearTimeout — do NOT take over requestAnimationFrame,
+    // otherwise vi.useFakeTimers replaces our synchronous RAF stub and the
+    // initial OSMD render (which uses RAF) never completes, so isRendering stays
+    // true and the resize effect returns early.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      render(<SheetMusic musicxml={SAMPLE_XML} />);
+      await settle();
+      const renderCountBefore = mockRender.mock.calls.length;
+      act(() => {
+        fireEvent(window, new Event('resize'));
+        vi.advanceTimersByTime(200);
+      });
+      expect(mockRender.mock.calls.length).toBeGreaterThan(renderCountBefore);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('SheetMusic — downloadPNG', () => {
+  beforeEach(() => setupOsmdMock());
+  afterEach(() => vi.restoreAllMocks());
+
+  it('PNG button click does not throw when container has no SVG elements', async () => {
+    render(<SheetMusic musicxml={SAMPLE_XML} filename="track.mp3" />);
+    await settle();
+    expect(() =>
+      fireEvent.click(screen.getByRole('button', { name: /png/i }))
+    ).not.toThrow();
+  });
+
+  it('PNG button tolerates SVG-to-image conversion errors', async () => {
+    const { container } = render(
+      <SheetMusic musicxml={SAMPLE_XML} filename="track.mp3" />
+    );
+    await settle();
+
+    const sheetContainer = container.querySelector(
+      'div[class=""]'
+    ) as HTMLDivElement;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    Object.defineProperty(svg, 'clientWidth', { value: 800 });
+    Object.defineProperty(svg, 'clientHeight', { value: 600 });
+    sheetContainer?.appendChild(svg);
+
+    const mockCtx = {
+      scale: vi.fn(),
+      fillStyle: '',
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+      mockCtx as unknown as CanvasRenderingContext2D
+    );
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(
+      function (this: HTMLCanvasElement, cb) {
+        cb(null);
+      }
+    );
+
+    class FakeImageError {
+      onload?: () => void;
+      onerror?: () => void;
+      set src(_: string) {
+        Promise.resolve().then(() => this.onerror?.());
+      }
+    }
+    vi.stubGlobal('Image', FakeImageError);
+
+    try {
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /png/i }));
+        await new Promise((r) => setTimeout(r, 50));
+      });
+      // Should complete without throwing even when img.onerror fires.
+    } finally {
+      vi.stubGlobal('Image', globalThis.Image);
+    }
+  });
+
+  it('PNG button downloads when SVG elements are present', async () => {
+    const { container } = render(
+      <SheetMusic musicxml={SAMPLE_XML} filename="track.mp3" />
+    );
+    await settle();
+
+    const sheetContainer = container.querySelector(
+      'div[class=""]'
+    ) as HTMLDivElement;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    Object.defineProperty(svg, 'clientWidth', { value: 800 });
+    Object.defineProperty(svg, 'clientHeight', { value: 600 });
+    sheetContainer?.appendChild(svg);
+
+    const mockCtx = {
+      scale: vi.fn(),
+      fillStyle: '',
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+      mockCtx as unknown as CanvasRenderingContext2D
+    );
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(
+      function (this: HTMLCanvasElement, cb) {
+        cb(new Blob(['png'], { type: 'image/png' }));
+      }
+    );
+
+    // Stub Image so img.onload fires synchronously when src is set.
+    const OrigImage = globalThis.Image;
+    class FakeImage {
+      onload?: () => void;
+      onerror?: () => void;
+      set src(_: string) {
+        Promise.resolve().then(() => this.onload?.());
+      }
+    }
+    vi.stubGlobal('Image', FakeImage);
+
+    const appendSpy = vi
+      .spyOn(document.body, 'appendChild')
+      .mockImplementation((n) => n);
+    const removeSpy = vi
+      .spyOn(document.body, 'removeChild')
+      .mockImplementation((n) => n);
+
+    try {
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /png/i }));
+        await new Promise((r) => setTimeout(r, 50));
+      });
+      expect(mockCtx.drawImage).toHaveBeenCalled();
+    } finally {
+      appendSpy.mockRestore();
+      removeSpy.mockRestore();
+      vi.stubGlobal('Image', OrigImage);
+    }
   });
 });

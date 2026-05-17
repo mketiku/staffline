@@ -70,6 +70,16 @@ describe('saveToHistory', () => {
     expect(loadHistory()[0].filename).toBe('b.mp3');
   });
 
+  it('silently swallows localStorage quota errors', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('QuotaExceededError');
+    });
+    expect(() =>
+      saveToHistory({ filename: 'a.mp3', hash: 'x', musicxml: '<xml/>' })
+    ).not.toThrow();
+    vi.restoreAllMocks();
+  });
+
   it('caps history at 10 entries', () => {
     for (let i = 0; i < 12; i++) {
       saveToHistory({
@@ -92,6 +102,19 @@ describe('removeFromHistory', () => {
     const stored = loadHistory();
     expect(stored).toHaveLength(1);
     expect(stored[0].hash).toBe('bbb');
+  });
+
+  it('silently swallows localStorage errors', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('QuotaExceededError');
+    });
+    saveToHistory({ filename: 'a.mp3', hash: 'aaa', musicxml: '<xml/>' });
+    vi.restoreAllMocks();
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('QuotaExceededError');
+    });
+    expect(() => removeFromHistory('aaa')).not.toThrow();
+    vi.restoreAllMocks();
   });
 
   it('does nothing for an unknown hash', () => {

@@ -24,7 +24,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     exclude: ['**/node_modules/**', '**/e2e/**'],
     coverage: {
-      provider: 'v8',
+      provider: 'istanbul',
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
         'src/main.tsx',

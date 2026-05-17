@@ -254,6 +254,47 @@ describe('App — transcription success', () => {
     expect(screen.getByTestId('sm-musicxml').textContent).toBe('<cached-xml/>');
   });
 
+  it('renders the loading state with stage label and filename while transcribing', async () => {
+    let resolveTranscription!: (v: string) => void;
+    vi.mocked(transcribeAudioStream).mockReturnValue(
+      new Promise<string>((res) => {
+        resolveTranscription = res;
+      })
+    );
+
+    renderApp();
+    const input = document.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [mockFile] } });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Confirm Trim'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText('Validating file…')).toBeInTheDocument();
+    expect(screen.getByText('song.mp3')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveTranscription('<xml/>');
+      await Promise.resolve();
+    });
+  });
+
+  it('cycles music facts after 5 seconds', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    try {
+      renderApp();
+      act(() => {
+        vi.advanceTimersByTime(5100);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('"Try another" button returns to idle', async () => {
     vi.mocked(transcribeAudioStream).mockResolvedValue('<xml/>');
 
