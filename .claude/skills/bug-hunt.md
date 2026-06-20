@@ -1,5 +1,5 @@
 ---
-name: bug_hunt
+name: bug-hunt
 description: Use to investigate and fix a bug systematically. Emphasizes root cause analysis before writing any fix.
 ---
 

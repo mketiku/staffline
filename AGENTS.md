@@ -69,17 +69,17 @@ Conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`
 - **Vercel** (frontend only). Ignored Build Step: `bash scripts/vercel-build-skip.sh`
 - `[skip ci]` skips GitHub Actions **and** Vercel — use for docs/config-only commits.
 - `[skip vercel]` skips Vercel only (GitHub CI still runs) — set in the commit message.
-- See `.agents/skills/ci_skip.md` for the full decision table.
+- See `.agents/skills/ci-skip.md` for the full decision table.
 
 ## Skills (`.agents/skills/`)
 
 | Skill          | When to use                                      |
 | -------------- | ------------------------------------------------ |
 | `commit`       | Before every `git commit` or `git push`          |
-| `bug_hunt`     | Diagnosing any bug — broken flows, test failures |
-| `tdd_workflow` | Every implementation, feature, or bug fix        |
+| `bug-hunt`     | Diagnosing any bug — broken flows, test failures |
+| `tdd-workflow` | Every implementation, feature, or bug fix        |
 | `validation`   | Pre-push checks, diagnosing hook failures        |
-| `ci_skip`      | Deciding when/how to skip CI or Vercel builds    |
+| `ci-skip`      | Deciding when/how to skip CI or Vercel builds    |
 
 ## Key constraints
 

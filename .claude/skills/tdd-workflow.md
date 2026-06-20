@@ -1,5 +1,5 @@
 ---
-name: tdd_workflow
+name: tdd-workflow
 description: Use for every new implementation, feature, or bug fix. Enforces Red-Green-Refactor with the Vitest + jsdom stack.
 ---
 
