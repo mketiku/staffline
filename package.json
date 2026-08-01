@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "clsx": "^2.1.1",
-    "lucide-react": "^0.469.0",
+    "lucide-react": "^1.27.0",
     "motion": "^12.4.7",
     "opensheetmusicdisplay": "^1.8.9",
     "react": "^19.0.0",
